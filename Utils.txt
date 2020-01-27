@@ -1,0 +1,130 @@
+
+  public static LinkedList<String> getAllColumns(ResultSet rs) {
+    LinkedList<String> colList = new LinkedList<String>();
+    try {
+      ResultSetMetaData rsmd = rs.getMetaData();
+      int columnCount = rsmd.getColumnCount();
+      for (int i = 1; i <= columnCount; i++) {
+        String colName = rsmd.getColumnLabel(i);
+        colList.add(colName);
+      }
+    } catch (SQLException e) {
+    }
+    return colList;
+  }
+
+  public static ArrayNode runQuery(String query) {
+    logger.debug("Query:" + query);
+    ResultSetExtractor<ArrayNode> obj = new ResultSetExtractor<ArrayNode>() {
+      public ArrayNode extractData(ResultSet rs) throws SQLException, DataAccessException {
+        ArrayNode data = new ObjectMapper().createArrayNode();
+        LinkedList<String> allColumns = getAllColumns(rs);
+        while (rs.next()) {
+          JsonNode row = new ObjectMapper().createObjectNode();
+          for (int i = 0; i < allColumns.size(); i++) {
+            String value = rs.getString(allColumns.get(i).toString());
+            if (value == null) {
+              value = "";
+            }
+            ((ObjectNode) row).put(allColumns.get(i).toString(), value);
+          }
+          data.add(row);
+        }
+        return data;
+      }
+    };
+
+    ArrayNode retVal = new ObjectMapper().createArrayNode();
+
+    try {
+      retVal = ConfigUtility.jdbcTemplate.query(query, obj);
+    } catch (Exception e) {
+      logger.error(e.getLocalizedMessage());
+    }
+    return retVal;
+  }
+
+  public static ArrayNode runQueryWhereAnd(String tableName, HashMap<String, String> whereClause) {
+    String query = "SELECT * FROM " + tableName + " ";
+    if (whereClause.size() > 0) {
+      query += " where ";
+      Iterator<String> cols = whereClause.keySet().iterator();
+      while (cols.hasNext()) {
+        String columnName = cols.next();
+        query = query + " " + columnName + "='" + whereClause.get(columnName) + "' and ";
+      }
+      query = query.substring(0, query.length() - 5);
+    }
+    return runQuery(query);
+  }
+
+  public static ArrayNode runQueryWhereOr(String tableName, HashMap<String, String> whereClause) {
+    String query = "SELECT * FROM " + tableName + " ";
+    if (whereClause.size() > 0) {
+      query += " where ";
+      Iterator<String> cols = whereClause.keySet().iterator();
+      while (cols.hasNext()) {
+        String columnName = cols.next();
+        query = query + " " + columnName + "='" + whereClause.get(columnName) + "' or  ";
+      }
+      query = query.substring(0, query.length() - 5);
+    }
+    return runQuery(query);
+  }
+
+  public static Object getRandom(Object[] array) {
+    int rnd = new Random().nextInt(array.length);
+    return array[rnd];
+  }
+
+  public static String getFormattedData(Date inputDate) {
+    SimpleDateFormat updatedFormat =
+        new SimpleDateFormat(ConfigUtility.getProperty(Constants.CONFIG_CSLDATEFORMAT));
+    return updatedFormat.format(inputDate);
+  }
+
+  public static Date getFormattedDate(String inputDate) throws ParseException {
+    SimpleDateFormat updatedFormat =
+        new SimpleDateFormat(ConfigUtility.getProperty(Constants.CONFIG_CSLDATEFORMAT));
+    return updatedFormat.parse(inputDate);
+  }
+
+  public static int getNumberOfYearTillDate(Date inputDate) {
+    int retVal = 0;
+
+    Date currDate = new Date();
+    long diffInMillies = Math.abs(currDate.getTime() - inputDate.getTime());
+    long diff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
+    retVal = (int) (diff / 365);
+
+    return retVal;
+  }
+
+  public static int getNumberOfYearTillDate(String inputDate) {
+    logger.trace("Entering getNumberOfYearTillDate...");
+    int retVal = 0;
+
+    try {
+      Date currDate = new Date();
+      long diffInMillies = Math.abs(currDate.getTime() - getFormattedDate(inputDate).getTime());
+      long diff = TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
+      retVal = (int) (diff / 365);
+    } catch (Exception e) {
+      logger.error(e.getLocalizedMessage());
+    }
+    logger.trace("Exiting getNumberOfYearTillDate\n...");
+
+    return retVal;
+  }
+
+
+
+
+
+
+  public static String getISTTime(Date requestDate) {
+    DateFormat istFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    TimeZone istTime = TimeZone.getTimeZone("IST");
+    istFormat.setTimeZone(istTime);
+    return istFormat.format(requestDate);
+  }
